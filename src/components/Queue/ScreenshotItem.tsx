@@ -27,21 +27,21 @@ const ScreenshotItem: React.FC<ScreenshotItemProps> = ({
   return (
     <>
       <div
-        className={`border border-white relative ${isLoading ? "" : "group"}`}
+        className={`border border-slate-600/30 rounded-lg overflow-hidden backdrop-blur-sm bg-slate-800/20 relative ${isLoading ? "" : "group hover:border-slate-500/50 transition-all duration-200"}`}
       >
         <div className="w-full h-full relative">
           {isLoading && (
-            <div className="absolute inset-0 bg-black bg-opacity-50 z-10 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <div className="absolute inset-0 bg-slate-900/80 z-10 flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
             </div>
           )}
           <img
             src={screenshot.preview}
             alt="Screenshot"
-            className={`w-full h-full object-cover transition-transform duration-300 ${
+            className={`w-full h-full object-cover transition-all duration-300 ${
               isLoading
                 ? "opacity-50"
-                : "cursor-pointer group-hover:scale-105 group-hover:brightness-75"
+                : "cursor-pointer group-hover:scale-105 group-hover:brightness-110"
             }`}
           />
         </div>
@@ -51,10 +51,10 @@ const ScreenshotItem: React.FC<ScreenshotItemProps> = ({
               e.stopPropagation()
               handleDelete()
             }}
-            className="absolute top-2 left-2 p-1 rounded-full bg-black bg-opacity-50 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            className="absolute top-2 left-2 p-1.5 rounded-full glass-button-danger opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-105"
             aria-label="Delete screenshot"
           >
-            <X size={16} />
+            <X size={14} />
           </button>
         )}
       </div>

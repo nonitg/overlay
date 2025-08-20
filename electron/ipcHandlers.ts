@@ -29,29 +29,18 @@ export function initializeIpcHandlers(appState: AppState): void {
   })
 
   ipcMain.handle("get-screenshots", async () => {
-    console.log({ view: appState.getView() })
     try {
-      let previews = []
-      if (appState.getView() === "queue") {
-        previews = await Promise.all(
-          appState.getScreenshotQueue().map(async (path) => ({
-            path,
-            preview: await appState.getImagePreview(path)
-          }))
-        )
-      } else {
-        previews = await Promise.all(
-          appState.getExtraScreenshotQueue().map(async (path) => ({
-            path,
-            preview: await appState.getImagePreview(path)
-          }))
-        )
-      }
-      previews.forEach((preview: any) => console.log(preview.path))
+      const screenshots = appState.getScreenshotQueue()
+      const previews = await Promise.all(
+        screenshots.map(async (path) => ({
+          path,
+          preview: await appState.getImagePreview(path)
+        }))
+      )
       return previews
     } catch (error) {
       console.error("Error getting screenshots:", error)
-      throw error
+      return []
     }
   })
 
@@ -59,16 +48,7 @@ export function initializeIpcHandlers(appState: AppState): void {
     appState.toggleMainWindow()
   })
 
-  ipcMain.handle("reset-queues", async () => {
-    try {
-      appState.clearQueues()
-      console.log("Screenshot queues have been cleared.")
-      return { success: true }
-    } catch (error: any) {
-      console.error("Error resetting queues:", error)
-      return { success: false, error: error.message }
-    }
-  })
+  // reset-queues handler removed - queue management eliminated
 
   // IPC handler for analyzing audio from base64 data
   ipcMain.handle("analyze-audio-base64", async (event, data: string, mimeType: string) => {
@@ -112,6 +92,53 @@ export function initializeIpcHandlers(appState: AppState): void {
       throw error;
     }
   });
+
+  // new conversation processing handler
+  ipcMain.handle("process-question", async (event, data: {
+    question?: string,
+    screenshotPath: string,
+    isNewConversation: boolean
+  }) => {
+    try {
+      const { question, screenshotPath, isNewConversation } = data
+      
+      // get AI helper
+      const llmHelper = appState.processingHelper.getLLMHelper()
+      
+      // prepare context
+      let prompt = question || "What do you see in this image? Provide a helpful response."
+      
+      if (!isNewConversation) {
+        // add conversation context for follow-ups
+        const context = appState.getConversationContext()
+        if (context.length > 0) {
+          prompt = `Previous context: ${context.join('\n')}\n\nFollow-up: ${prompt}`
+        }
+      }
+      
+      // process with AI
+      const response = await llmHelper.analyzeImageFile(screenshotPath)
+      
+      // store context
+      if (isNewConversation) {
+        appState.setCurrentScreenshot(screenshotPath)
+      }
+      appState.addToConversationContext(`User: ${prompt}`)
+      appState.addToConversationContext(`AI: ${response.text}`)
+      
+      return {
+        success: true,
+        response: response.text,
+        timestamp: Date.now()
+      }
+    } catch (error: any) {
+      console.error("Error processing question:", error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  })
 
   ipcMain.handle("quit-app", () => {
     app.quit()

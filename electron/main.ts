@@ -27,6 +27,10 @@ export class AppState {
 
   private hasDebugged: boolean = false
 
+  // conversation context for new question flow
+  private conversationContext: string[] = []
+  private currentScreenshot: string | null = null
+
   // Processing events
   public readonly PROCESSING_EVENTS = {
     //global states
@@ -180,6 +184,33 @@ export class AppState {
 
   public centerAndShowWindow(): void {
     this.windowHelper.centerAndShowWindow()
+  }
+
+  // conversation context management
+  public clearConversationContext(): void {
+    this.conversationContext = []
+    this.currentScreenshot = null
+    console.log("Conversation context cleared")
+  }
+
+  public addToConversationContext(message: string): void {
+    this.conversationContext.push(message)
+    // keep only last 10 messages for performance
+    if (this.conversationContext.length > 10) {
+      this.conversationContext = this.conversationContext.slice(-10)
+    }
+  }
+
+  public getConversationContext(): string[] {
+    return this.conversationContext
+  }
+
+  public setCurrentScreenshot(path: string): void {
+    this.currentScreenshot = path
+  }
+
+  public getCurrentScreenshot(): string | null {
+    return this.currentScreenshot
   }
 
   public createTray(): void {

@@ -2,22 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Liquid Glass Effect Base */
+/* Sleek Liquid Glass Effect - Premium Design */
 .liquid-glass {
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(16px) saturate(180%) brightness(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%) brightness(120%);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(15, 15, 15, 0.65);
+  backdrop-filter: blur(24px) saturate(120%) brightness(110%);
+  -webkit-backdrop-filter: blur(24px) saturate(120%) brightness(110%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 1rem;
   box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.2) inset;
   position: relative;
   overflow: hidden;
 }
 
-/* Enhanced liquid glass with shimmer effect */
+/* Refined shimmer effect - more subtle */
 .liquid-glass::before {
   content: '';
   position: absolute;
@@ -28,10 +28,10 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.015),
     transparent
   );
-  animation: shimmer 3s ease-in-out infinite;
+  animation: shimmer 6s ease-in-out infinite;
   pointer-events: none;
 }
 
@@ -50,8 +50,8 @@
 /* Fallback for browsers without backdrop-filter support */
 @supports not (backdrop-filter: blur()) {
   .liquid-glass {
-    background: rgba(255, 255, 255, 0.5);
-    border: 2px solid rgba(255, 255, 255, 0.6);
+    background: rgba(15, 15, 15, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
 }
 
@@ -96,16 +96,119 @@ button, input, select, textarea, .interactive {
   -webkit-backdrop-filter: blur(2px);
 }
 
-/* Dark theme liquid glass variant */
-.liquid-glass-dark {
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(16px) saturate(180%) brightness(80%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%) brightness(80%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+/* Ultra-Sleek Glass Button System */
+.glass-button {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px) saturate(110%);
+  -webkit-backdrop-filter: blur(12px) saturate(110%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
   box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+    0 8px 25px rgba(0, 0, 0, 0.15),
+    0 3px 10px rgba(255, 255, 255, 0.1);
+}
+
+.glass-button:active {
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.04);
+  transition: all 0.1s ease;
+}
+
+.glass-button-secondary {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px) saturate(105%);
+  -webkit-backdrop-filter: blur(8px) saturate(105%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+}
+
+.glass-button-secondary:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.95);
+  transform: translateY(-0.5px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.glass-button-danger {
+  background: rgba(220, 38, 38, 0.08);
+  backdrop-filter: blur(12px) saturate(110%);
+  -webkit-backdrop-filter: blur(12px) saturate(110%);
+  border: 1px solid rgba(220, 38, 38, 0.15);
+  color: rgba(248, 113, 113, 0.95);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 500;
+}
+
+.glass-button-danger:hover {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.25);
+  color: rgba(248, 113, 113, 1);
+  transform: translateY(-1px);
+  box-shadow: 
+    0 8px 25px rgba(220, 38, 38, 0.15),
+    0 3px 10px rgba(220, 38, 38, 0.1);
+}
+
+/* Sophisticated accent system */
+.accent-primary {
+  color: rgba(229, 231, 235, 0.9); /* Bright white-gray */
+}
+
+.accent-primary-bg {
+  background-color: rgba(229, 231, 235, 0.08);
+}
+
+.accent-secondary {
+  color: rgba(209, 213, 219, 0.95); /* Refined light gray */
+}
+
+/* Premium loading states */
+.loading-pulse {
+  background: linear-gradient(
+    90deg,
+    rgba(229, 231, 235, 0.1),
+    rgba(255, 255, 255, 0.2),
+    rgba(229, 231, 235, 0.1)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Refined border system */
+.border-accent {
+  border-color: rgba(229, 231, 235, 0.15);
+}
+
+.border-accent-hover:hover {
+  border-color: rgba(229, 231, 235, 0.25);
+}
+
+/* Premium dark theme variant */
+.liquid-glass-dark {
+  background: rgba(8, 8, 8, 0.75);
+  backdrop-filter: blur(28px) saturate(110%) brightness(105%);
+  -webkit-backdrop-filter: blur(28px) saturate(110%) brightness(105%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.3) inset;
 }
 
 /* Ensure content is not blurred */
@@ -116,39 +219,39 @@ button, input, select, textarea, .interactive {
   -webkit-backdrop-filter: none;
 }
 
-/* Chat container specific styling */
+/* Sleek chat container */
 .liquid-glass.chat-container {
   min-height: auto;
   height: auto;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(20px) saturate(200%) brightness(110%);
-  -webkit-backdrop-filter: blur(20px) saturate(200%) brightness(110%);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(12, 12, 12, 0.75);
+  backdrop-filter: blur(32px) saturate(110%) brightness(108%);
+  -webkit-backdrop-filter: blur(32px) saturate(110%) brightness(108%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: 
-    0 12px 40px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    0 16px 48px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.15) inset;
 }
 
-/* Thin bar variant of liquid glass - for command bar */
+/* Sleek command bar - ultra-thin and sophisticated */
 .liquid-glass-bar {
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(16px) saturate(180%) brightness(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%) brightness(120%);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(10, 10, 10, 0.8);
+  backdrop-filter: blur(20px) saturate(115%) brightness(105%);
+  -webkit-backdrop-filter: blur(20px) saturate(115%) brightness(105%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 1rem;
   box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.25) inset;
   position: relative;
   overflow: hidden;
-  height: 32px !important;
-  min-height: 32px !important;
-  max-height: 32px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
 }
 
-/* Shimmer effect for bar variant */
+/* Refined shimmer for command bar */
 .liquid-glass-bar::before {
   content: '';
   position: absolute;
@@ -159,9 +262,68 @@ button, input, select, textarea, .interactive {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.02),
     transparent
   );
-  animation: shimmer 3s ease-in-out infinite;
+  animation: shimmer 8s ease-in-out infinite;
   pointer-events: none;
+}
+
+/* Extended conversation box - sleek and wide */
+.liquid-glass-extended {
+  background: rgba(12, 12, 12, 0.75);
+  backdrop-filter: blur(28px) saturate(115%) brightness(108%);
+  -webkit-backdrop-filter: blur(28px) saturate(115%) brightness(108%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  box-shadow: 
+    0 12px 48px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.15) inset;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ultra-subtle shimmer for extended box */
+.liquid-glass-extended::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.01),
+    transparent
+  );
+  animation: shimmer 10s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Custom conversation scrollbar - glassmorphism style */
+.conversation-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.conversation-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.conversation-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.conversation-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Firefox scrollbar */
+.conversation-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
 }

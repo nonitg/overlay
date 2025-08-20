@@ -11,20 +11,7 @@ export type ToastMessage = {
   variant: ToastVariant
 }
 
-const ToastViewport = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitive.Viewport>,
-  React.ComponentPropsWithoutRef<typeof ToastPrimitive.Viewport>
->(({ className, ...props }, ref) => (
-  <ToastPrimitive.Viewport
-    ref={ref}
-    className={cn(
-      "bg-transparent fixed bottom-0 right-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
-      className
-    )}
-    {...props}
-  />
-))
-ToastViewport.displayName = ToastPrimitive.Viewport.displayName
+// ToastViewport removed - was causing full-screen overlay blocking clicks
 
 type ToastVariant = "neutral" | "success" | "error"
 
@@ -46,7 +33,7 @@ const Toast = React.forwardRef<
   <ToastPrimitive.Root
     ref={ref}
     className={cn(
-      "group fixed top-4 left-4 z-50 w-auto max-w-sm px-4 py-2 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom",
+      "group absolute top-2 right-2 z-50 w-auto max-w-sm px-4 py-2 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom",
       toastVariants[variant],
       className
     )}
@@ -111,7 +98,6 @@ ToastDescription.displayName = ToastPrimitive.Description.displayName
 export type { ToastProps, ToastVariant }
 export {
   ToastProvider,
-  ToastViewport,
   Toast,
   ToastAction,
   ToastClose,

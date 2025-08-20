@@ -35,6 +35,16 @@ interface ElectronAPI {
   analyzeImageFile: (path: string) => Promise<void>
   quitApp: () => Promise<void>
   invoke: (channel: string, ...args: any[]) => Promise<any>
+
+  // new conversation events  
+  onNewQuestion?: (callback: () => void) => () => void
+
+  onFollowUpQuestion?: (callback: (data: {
+    screenshotPath: string,
+    hasContext: boolean
+  }) => void) => () => void
+
+  onNoContextWarning?: (callback: () => void) => () => void
 }
 
 export const PROCESSING_EVENTS = {
@@ -171,5 +181,28 @@ contextBridge.exposeInMainWorld("electronAPI", {
   analyzeAudioFile: (path: string) => ipcRenderer.invoke("analyze-audio-file", path),
   analyzeImageFile: (path: string) => ipcRenderer.invoke("analyze-image-file", path),
   quitApp: () => ipcRenderer.invoke("quit-app"),
-  invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args)
+  invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+
+  // new event listeners
+  onNewQuestion: (callback: Function) => {
+    console.log("🔧 Setting up onNewQuestion listener")
+    const unsubscribe = (event: any) => {
+      console.log("📨 Preload received new-question event")
+      callback()
+    }
+    ipcRenderer.on('new-question', unsubscribe)
+    return () => ipcRenderer.removeListener('new-question', unsubscribe)
+  },
+
+  onFollowUpQuestion: (callback: Function) => {
+    const unsubscribe = (event: any, data: any) => callback(data)
+    ipcRenderer.on('follow-up-question', unsubscribe)
+    return () => ipcRenderer.removeListener('follow-up-question', unsubscribe)
+  },
+
+  onNoContextWarning: (callback: Function) => {
+    const unsubscribe = () => callback()
+    ipcRenderer.on('no-context-warning', unsubscribe)
+    return () => ipcRenderer.removeListener('no-context-warning', unsubscribe)
+  }
 } as ElectronAPI)

@@ -9,55 +9,65 @@ export class ShortcutsHelper {
   }
 
   public registerGlobalShortcuts(): void {
+    console.log("🔧 Registering global shortcuts...")
+    
     // Add global shortcut to show/center window
-    globalShortcut.register("CommandOrControl+Shift+Space", () => {
-      console.log("Show/Center window shortcut pressed...")
+    const spaceShortcut = globalShortcut.register("CommandOrControl+Shift+Space", () => {
+      console.log("✅ Show/Center window shortcut pressed...")
       this.appState.centerAndShowWindow()
     })
+    console.log("🔧 CommandOrControl+Shift+Space registered:", spaceShortcut)
 
-    globalShortcut.register("CommandOrControl+H", async () => {
-      const mainWindow = this.appState.getMainWindow()
-      if (mainWindow) {
-        console.log("Taking screenshot...")
-        try {
-          const screenshotPath = await this.appState.takeScreenshot()
-          const preview = await this.appState.getImagePreview(screenshotPath)
-          mainWindow.webContents.send("screenshot-taken", {
-            path: screenshotPath,
-            preview
-          })
-        } catch (error) {
-          console.error("Error capturing screenshot:", error)
+    // cmd+h screenshot functionality removed
+
+    const enterShortcut = globalShortcut.register("CommandOrControl+Enter", async () => {
+      console.log("✅ Cmd+Enter pressed - New question: show dialog first")
+      
+      try {
+        // clear existing context
+        this.appState.clearConversationContext()
+        
+        // send event to show question dialog
+        const mainWindow = this.appState.getMainWindow()
+        if (mainWindow) {
+          console.log("📤 Sending new-question event to renderer")
+          mainWindow.webContents.send("new-question")
+        } else {
+          console.error("❌ No main window available")
         }
+      } catch (error) {
+        console.error("❌ Error in new question flow:", error)
+      }
+    })
+    console.log("🔧 CommandOrControl+Enter registered:", enterShortcut)
+
+    globalShortcut.register("CommandOrControl+Shift+Enter", async () => {
+      console.log("Follow-up question: same context")
+      
+      try {
+        // check if we have existing context
+        const currentScreenshot = this.appState.getCurrentScreenshot()
+        if (!currentScreenshot) {
+          console.log("No existing conversation - treating as new question")
+          // trigger new question flow instead
+          this.appState.getMainWindow()?.webContents.send("no-context-warning")
+          return
+        }
+        
+        // send follow-up event to renderer
+        const mainWindow = this.appState.getMainWindow()
+        if (mainWindow) {
+          mainWindow.webContents.send("follow-up-question", {
+            screenshotPath: currentScreenshot,
+            hasContext: true
+          })
+        }
+      } catch (error) {
+        console.error("Error in follow-up flow:", error)
       }
     })
 
-    globalShortcut.register("CommandOrControl+Enter", async () => {
-      await this.appState.processingHelper.processScreenshots()
-    })
-
-    globalShortcut.register("CommandOrControl+R", () => {
-      console.log(
-        "Command + R pressed. Canceling requests and resetting queues..."
-      )
-
-      // Cancel ongoing API requests
-      this.appState.processingHelper.cancelOngoingRequests()
-
-      // Clear both screenshot queues
-      this.appState.clearQueues()
-
-      console.log("Cleared queues.")
-
-      // Update the view state to 'queue'
-      this.appState.setView("queue")
-
-      // Notify renderer process to switch view to 'queue'
-      const mainWindow = this.appState.getMainWindow()
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send("reset-view")
-      }
-    })
+    // cmd+r reset functionality removed
 
     // New shortcuts for moving the window
     globalShortcut.register("CommandOrControl+Left", () => {

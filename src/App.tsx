@@ -1,8 +1,6 @@
 import { ToastProvider } from "./components/ui/toast"
-import Queue from "./_pages/Queue"
-import { ToastViewport } from "@radix-ui/react-toast"
+import Main from "./_pages/Main"
 import { useEffect, useRef, useState } from "react"
-import Solutions from "./_pages/Solutions"
 import { QueryClient, QueryClientProvider } from "react-query"
 
 declare global {
@@ -25,19 +23,10 @@ declare global {
       onResetView: (callback: () => void) => () => void
       takeScreenshot: () => Promise<void>
 
-      //INITIAL SOLUTION EVENTS
+      // solution/debug events removed
       deleteScreenshot: (
         path: string
       ) => Promise<{ success: boolean; error?: string }>
-      onSolutionStart: (callback: () => void) => () => void
-      onSolutionError: (callback: (error: string) => void) => () => void
-      onSolutionSuccess: (callback: (data: any) => void) => () => void
-      onProblemExtracted: (callback: (data: any) => void) => () => void
-
-      onDebugSuccess: (callback: (data: any) => void) => () => void
-
-      onDebugStart: (callback: () => void) => () => void
-      onDebugError: (callback: (error: string) => void) => () => void
 
       // Audio Processing
       analyzeAudioFromBase64: (data: string, mimeType: string) => Promise<{ text: string; timestamp: number }>
@@ -63,7 +52,7 @@ const queryClient = new QueryClient({
 })
 
 const App: React.FC = () => {
-  const [view, setView] = useState<"queue" | "solutions" | "debug">("queue")
+  const [view, setView] = useState<"main">("main")
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Effect for height monitoring
@@ -71,10 +60,7 @@ const App: React.FC = () => {
     const cleanup = window.electronAPI.onResetView(() => {
       console.log("Received 'reset-view' message from main process.")
       queryClient.invalidateQueries(["screenshots"])
-      queryClient.invalidateQueries(["problem_statement"])
-      queryClient.invalidateQueries(["solution"])
-      queryClient.invalidateQueries(["new_solution"])
-      setView("queue")
+      setView("main")
     })
 
     return () => {
@@ -87,9 +73,20 @@ const App: React.FC = () => {
 
     const updateHeight = () => {
       if (!containerRef.current) return
-      const height = containerRef.current.scrollHeight
-      const width = containerRef.current.scrollWidth
-      window.electronAPI?.updateContentDimensions({ width, height })
+      
+      // Get the actual content dimensions - use getBoundingClientRect for accurate sizing
+      const rect = containerRef.current.getBoundingClientRect()
+      const width = Math.ceil(rect.width)
+      const height = Math.ceil(rect.height)
+      
+      // Cap the maximum size to prevent huge windows
+      const finalWidth = Math.min(Math.max(width, 200), 800)  // Max 800px wide
+      const finalHeight = Math.min(Math.max(height, 100), 600)  // Max 600px tall
+      
+      window.electronAPI?.updateContentDimensions({ 
+        width: finalWidth, 
+        height: finalHeight 
+      })
     }
 
     const resizeObserver = new ResizeObserver(() => {
@@ -122,51 +119,26 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const cleanupFunctions = [
-      window.electronAPI.onSolutionStart(() => {
-        setView("solutions")
-        console.log("starting processing")
-      }),
-
       window.electronAPI.onUnauthorized(() => {
         queryClient.removeQueries(["screenshots"])
-        queryClient.removeQueries(["solution"])
-        queryClient.removeQueries(["problem_statement"])
-        setView("queue")
+        setView("main")
         console.log("Unauthorized")
       }),
-      // Update this reset handler
       window.electronAPI.onResetView(() => {
         console.log("Received 'reset-view' message from main process")
-
         queryClient.removeQueries(["screenshots"])
-        queryClient.removeQueries(["solution"])
-        queryClient.removeQueries(["problem_statement"])
-        setView("queue")
-        console.log("View reset to 'queue' via Command+R shortcut")
-      }),
-      window.electronAPI.onProblemExtracted((data: any) => {
-        if (view === "queue") {
-          console.log("Problem extracted successfully")
-          queryClient.invalidateQueries(["problem_statement"])
-          queryClient.setQueryData(["problem_statement"], data)
-        }
+        setView("main")
+        console.log("View reset to 'main' via Command+R shortcut")
       })
     ]
     return () => cleanupFunctions.forEach((cleanup) => cleanup())
   }, [])
 
   return (
-    <div ref={containerRef} className="min-h-0">
+    <div ref={containerRef} className="min-h-0 w-fit max-w-2xl overflow-visible">
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          {view === "queue" ? (
-            <Queue setView={setView} />
-          ) : view === "solutions" ? (
-            <Solutions setView={setView} />
-          ) : (
-            <></>
-          )}
-          <ToastViewport />
+          <Main setView={setView} />
         </ToastProvider>
       </QueryClientProvider>
     </div>

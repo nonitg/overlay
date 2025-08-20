@@ -26,6 +26,16 @@ export interface ElectronAPI {
   analyzeAudioFile: (path: string) => Promise<{ text: string; timestamp: number }>
   quitApp: () => Promise<void>
   invoke: (channel: string, ...args: any[]) => Promise<any>
+
+  // new conversation events  
+  onNewQuestion?: (callback: () => void) => () => void
+
+  onFollowUpQuestion?: (callback: (data: {
+    screenshotPath: string,
+    hasContext: boolean
+  }) => void) => () => void
+
+  onNoContextWarning?: (callback: () => void) => () => void
 }
 
 declare global {
