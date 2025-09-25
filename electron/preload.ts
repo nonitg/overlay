@@ -195,7 +195,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   onFollowUpQuestion: (callback: Function) => {
-    const unsubscribe = (event: any, data: any) => callback(data)
+    const unsubscribe = (event: any, data: any) => {
+      console.log("📨 Follow-up question event received")
+      callback(data)
+    }
     ipcRenderer.on('follow-up-question', unsubscribe)
     return () => ipcRenderer.removeListener('follow-up-question', unsubscribe)
   },

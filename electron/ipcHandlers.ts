@@ -48,29 +48,21 @@ export function initializeIpcHandlers(appState: AppState): void {
     appState.toggleMainWindow()
   })
 
+  // Get current screenshot path for follow-up questions
+  ipcMain.handle("get-current-screenshot", async () => {
+    return appState.getCurrentScreenshot()
+  })
+
+  // Get conversation context for display
+  ipcMain.handle("get-conversation-context", async () => {
+    return appState.getConversationContext()
+  })
+
+
+
   // reset-queues handler removed - queue management eliminated
 
-  // IPC handler for analyzing audio from base64 data
-  ipcMain.handle("analyze-audio-base64", async (event, data: string, mimeType: string) => {
-    try {
-      const result = await appState.processingHelper.processAudioBase64(data, mimeType)
-      return result
-    } catch (error: any) {
-      console.error("Error in analyze-audio-base64 handler:", error)
-      throw error
-    }
-  })
-
-  // IPC handler for analyzing audio from file path
-  ipcMain.handle("analyze-audio-file", async (event, path: string) => {
-    try {
-      const result = await appState.processingHelper.processAudioFile(path)
-      return result
-    } catch (error: any) {
-      console.error("Error in analyze-audio-file handler:", error)
-      throw error
-    }
-  })
+  // Audio processing removed
 
   // IPC handler for analyzing image from file path
   ipcMain.handle("analyze-image-file", async (event, path: string) => {
@@ -97,39 +89,56 @@ export function initializeIpcHandlers(appState: AppState): void {
   ipcMain.handle("process-question", async (event, data: {
     question?: string,
     screenshotPath: string,
-    isNewConversation: boolean
+    isNewConversation: boolean,
+    useProMode?: boolean
   }) => {
     try {
-      const { question, screenshotPath, isNewConversation } = data
+      const { question, screenshotPath, isNewConversation, useProMode = false } = data
       
-      // get AI helper
+      // get AI helper and set model mode
       const llmHelper = appState.processingHelper.getLLMHelper()
+      llmHelper.setProMode(useProMode)
       
-      // prepare context
-      let prompt = question || "What do you see in this image? Provide a helpful response."
+      console.log(`🤖 Processing with ${useProMode ? 'Gemini Pro' : 'Gemini Flash'} model`)
       
-      if (!isNewConversation) {
-        // add conversation context for follow-ups
+      // prepare prompt based on conversation type
+      let fullPrompt: string
+      
+      if (isNewConversation) {
+        // initial question - direct and concise
+        const userQuestion = question || "What do you see in this image?"
+        fullPrompt = `${llmHelper.systemPrompt}\n\n"${userQuestion}"`
+      } else {
+        // follow-up question - include full context
         const context = appState.getConversationContext()
         if (context.length > 0) {
-          prompt = `Previous context: ${context.join('\n')}\n\nFollow-up: ${prompt}`
+          const userQuestion = question || "Continue the conversation"
+          fullPrompt = `${llmHelper.systemPrompt}\n\nPrevious:\n${context.join('\n')}\n\n"${userQuestion}"`
+        } else {
+          // fallback if no context
+          const userQuestion = question || "What do you see in this image?"
+          fullPrompt = `${llmHelper.systemPrompt}\n\n"${userQuestion}"`
         }
       }
       
+      // DEBUG: Log the prompt being sent
+      console.log("🔍 Prompt:", fullPrompt.substring(0, 100) + "...")
+      
       // process with AI
-      const response = await llmHelper.analyzeImageFile(screenshotPath)
+      const response = await llmHelper.analyzeImageWithPrompt(screenshotPath, fullPrompt)
       
       // store context
       if (isNewConversation) {
         appState.setCurrentScreenshot(screenshotPath)
       }
-      appState.addToConversationContext(`User: ${prompt}`)
+      appState.addToConversationContext(`User: ${question || "What do you see in this image?"}`)
       appState.addToConversationContext(`AI: ${response.text}`)
       
       return {
         success: true,
         response: response.text,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        modelUsed: llmHelper.getCurrentModelName()
       }
     } catch (error: any) {
       console.error("Error processing question:", error)
@@ -164,4 +173,5 @@ export function initializeIpcHandlers(appState: AppState): void {
   ipcMain.handle("center-and-show-window", async () => {
     appState.centerAndShowWindow()
   })
+
 }

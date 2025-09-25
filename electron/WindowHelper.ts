@@ -5,9 +5,42 @@ import path from "node:path"
 
 const isDev = process.env.NODE_ENV === "development"
 
-const startUrl = isDev
-  ? "http://localhost:5180"
-  : `file://${path.join(__dirname, "../dist/index.html")}`
+// fix path resolution for built app - when packaged, files are in app.asar
+const getStartUrl = () => {
+  if (isDev) {
+    return "http://localhost:5173"
+  }
+  
+  // in production, try multiple possible paths
+  const possiblePaths = [
+    path.join(__dirname, "../dist/index.html"),
+    path.join(__dirname, "../../dist/index.html"), 
+    path.join(process.resourcesPath, "app.asar/dist/index.html"),
+    path.join(process.resourcesPath, "dist/index.html")
+  ]
+  
+  const fs = require('fs')
+  console.log(`[ASSISTANT-DEBUG] Checking for index.html in production mode...`)
+  console.log(`[ASSISTANT-DEBUG] __dirname: ${__dirname}`)
+  console.log(`[ASSISTANT-DEBUG] process.resourcesPath: ${process.resourcesPath}`)
+  
+  for (const htmlPath of possiblePaths) {
+    console.log(`[ASSISTANT-DEBUG] Checking path: ${htmlPath}`)
+    if (fs.existsSync(htmlPath)) {
+      console.log(`[ASSISTANT-DEBUG] ✓ Found index.html at: ${htmlPath}`)
+      return `file://${htmlPath}`
+    } else {
+      console.log(`[ASSISTANT-DEBUG] ✗ Not found: ${htmlPath}`)
+    }
+  }
+  
+  // fallback
+  const fallback = path.join(__dirname, "../dist/index.html")
+  console.log(`[ASSISTANT-DEBUG] No valid path found, using fallback: ${fallback}`)
+  return `file://${fallback}`
+}
+
+const startUrl = getStartUrl()
 
 export class WindowHelper {
   private mainWindow: BrowserWindow | null = null
@@ -37,9 +70,9 @@ export class WindowHelper {
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workAreaSize
 
-    // Use 75% width if debugging has occurred, otherwise use 60%
+    // Use narrower width to allow interaction with underlying apps - 50% for debugging, 40% otherwise
     const maxAllowedWidth = Math.floor(
-      workArea.width * (this.appState.getHasDebugged() ? 0.75 : 0.5)
+      workArea.width * (this.appState.getHasDebugged() ? 0.5 : 0.4)
     )
 
     // Ensure width doesn't exceed max allowed width and height is reasonable
@@ -73,29 +106,46 @@ export class WindowHelper {
     this.screenHeight = workArea.height
 
     
+    // stealth overlay window settings
     const windowSettings: Electron.BrowserWindowConstructorOptions = {
-      width: 400,
+      title: "", // No title to avoid showing in menu bar
+      width: 700,
       height: 600,
-      minWidth: 300,
+      minWidth: 500,
       minHeight: 200,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
-        preload: path.join(__dirname, "preload.js")
+        preload: path.join(__dirname, "preload.js"),
+        backgroundThrottling: false, // Prevent throttling when hidden
+        webSecurity: false, // Disable for stealth
+        allowRunningInsecureContent: true,
+        experimentalFeatures: true,
+        spellcheck: false,
+        devTools: false, // Disable dev tools completely
+        sandbox: false // Disable sandboxing for stealth
       },
       show: false, // Start hidden, then show after setup
       alwaysOnTop: true,
-      frame: false,
-      transparent: true,
+      frame: false, // frameless for stealth
+      transparent: true, // transparent background
       fullscreenable: false,
-      hasShadow: false,
-      backgroundColor: "#00000000",
+      hasShadow: false, // no shadow for stealth
+      backgroundColor: "#00000000", // transparent background
       focusable: true,
       resizable: true,
       movable: true,
+      skipTaskbar: true, // Don't appear in taskbar/dock
+      acceptFirstMouse: false, // Prevent mouse click focusing
+      disableAutoHideCursor: true,
+      enableLargerThanScreen: true,
+      thickFrame: false,
+      // Remove vibrancy for true transparency
       x: 100, // Start at a visible position
       y: 100
     }
+    
+    console.log("[ASSISTANT-DEBUG] Creating window with settings:", JSON.stringify(windowSettings, null, 2))
 
     this.mainWindow = new BrowserWindow(windowSettings)
     // this.mainWindow.webContents.openDevTools()
@@ -107,19 +157,26 @@ export class WindowHelper {
       })
       this.mainWindow.setHiddenInMissionControl(true)
       this.mainWindow.setAlwaysOnTop(true, "floating")
-    }
-    if (process.platform === "linux") {
+    } else if (process.platform === "linux") {
       // Linux-specific optimizations for stealth overlays
       if (this.mainWindow.setHasShadow) {
         this.mainWindow.setHasShadow(false)
       }
       this.mainWindow.setFocusable(false)
-    } 
-    this.mainWindow.setSkipTaskbar(true)
-    this.mainWindow.setAlwaysOnTop(true)
+    }
+    // skipTaskbar already set in window settings
 
+    console.log(`[ASSISTANT-DEBUG] Loading URL: ${startUrl}`)
     this.mainWindow.loadURL(startUrl).catch((err) => {
-      console.error("Failed to load URL:", err)
+      console.error("[ASSISTANT-DEBUG] Failed to load URL:", startUrl, err)
+      // try alternative URL if first fails
+      if (!isDev) {
+        const altUrl = `file://${path.join(__dirname, "../dist/index.html")}`
+        console.log(`[ASSISTANT-DEBUG] Trying alternative URL: ${altUrl}`)
+        this.mainWindow?.loadURL(altUrl).catch((err2) => {
+          console.error("[ASSISTANT-DEBUG] Failed to load alternative URL:", altUrl, err2)
+        })
+      }
     })
 
     // Show window after loading URL and center it
@@ -127,12 +184,42 @@ export class WindowHelper {
       if (this.mainWindow) {
         // Center the window first
         this.centerWindow()
-        this.mainWindow.show()
-        this.mainWindow.focus()
+        
+        // Log window state before showing
+        const bounds = this.mainWindow.getBounds()
+        console.log("[ASSISTANT-DEBUG] Window bounds before show:", bounds)
+        console.log("[ASSISTANT-DEBUG] Window isVisible before show:", this.mainWindow.isVisible())
+        console.log("[ASSISTANT-DEBUG] Window isMinimized:", this.mainWindow.isMinimized())
+        
+        this.mainWindow.showInactive() // Show without focusing to avoid menu bar
         this.mainWindow.setAlwaysOnTop(true)
-        console.log("Window is now visible and centered")
+        this.isWindowVisible = true
+        
+        // Log window state after showing
+        console.log("[ASSISTANT-DEBUG] Window isVisible after show:", this.mainWindow.isVisible())
+        console.log("[ASSISTANT-DEBUG] Window bounds after show:", this.mainWindow.getBounds())
+        console.log("[ASSISTANT-DEBUG] Window is now visible and centered via ready-to-show")
       }
     })
+    
+    // additional debug logging
+    this.mainWindow.webContents.once('did-finish-load', () => {
+      console.log("[ASSISTANT-DEBUG] Window finished loading content")
+    })
+    
+    this.mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      console.error("[ASSISTANT-DEBUG] Window failed to load:", { errorCode, errorDescription, validatedURL })
+    })
+    
+    // Fallback: force show window after 2 seconds if it hasn't shown yet
+    setTimeout(() => {
+      if (this.mainWindow && !this.mainWindow.isVisible()) {
+        console.log("[ASSISTANT-DEBUG] Window not visible after 2s, forcing show")
+        this.centerWindow()
+        this.mainWindow.showInactive() // Show without focusing to avoid menu bar
+        this.isWindowVisible = true
+      }
+    }, 2000)
 
     const bounds = this.mainWindow.getBounds()
     this.windowPosition = { x: bounds.x, y: bounds.y }
@@ -141,7 +228,16 @@ export class WindowHelper {
     this.currentY = bounds.y
 
     this.setupWindowListeners()
-    this.isWindowVisible = true
+    
+    // Force window visible after 3 seconds regardless
+    setTimeout(() => {
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        console.log("[ASSISTANT-DEBUG] Force setting window visible after 3s")
+        this.mainWindow.showInactive() // Show without focusing to avoid menu bar
+        this.mainWindow.moveTop()
+        this.isWindowVisible = true
+      }
+    }, 3000)
   }
 
   private setupWindowListeners(): void {
@@ -259,9 +355,7 @@ export class WindowHelper {
     }
 
     this.centerWindow()
-    this.mainWindow.show()
-    this.mainWindow.focus()
-    this.mainWindow.setAlwaysOnTop(true)
+    this.mainWindow.showInactive() // Show without focusing to avoid menu bar
     this.isWindowVisible = true
     
     console.log(`Window centered and shown`)

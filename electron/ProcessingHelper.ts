@@ -18,10 +18,10 @@ export class ProcessingHelper {
 
   constructor(appState: AppState) {
     this.appState = appState
-    const apiKey = process.env.GEMINI_API_KEY
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY not found in environment variables")
-    }
+    
+    // hardcoded API key - replace YOUR_GEMINI_API_KEY_HERE with your actual key
+    const apiKey = "AIzaSyBg3HCnDBgY022Wy7Jaj4TwDp0PGkZoXo4"
+    
     this.llmHelper = new LLMHelper(apiKey)
   }
 
@@ -29,15 +29,7 @@ export class ProcessingHelper {
 
   // cancelOngoingRequests method removed - problem extraction logic eliminated
 
-  public async processAudioBase64(data: string, mimeType: string) {
-    // Directly use LLMHelper to analyze inline base64 audio
-    return this.llmHelper.analyzeAudioFromBase64(data, mimeType);
-  }
-
-  // Add audio file processing method
-  public async processAudioFile(filePath: string) {
-    return this.llmHelper.analyzeAudioFile(filePath);
-  }
+  // Audio processing removed
 
   public getLLMHelper() {
     return this.llmHelper;

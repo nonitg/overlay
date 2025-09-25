@@ -14,7 +14,7 @@ interface QueueProps {
   setView: React.Dispatch<React.SetStateAction<"main">>
 }
 
-const Queue: React.FC<QueueProps> = ({ setView }) => {
+const Queue: React.FC<QueueProps> = ({ }) => {
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<ToastMessage>({
     title: "",
@@ -84,15 +84,6 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
     const cleanupFunctions = [
       window.electronAPI.onScreenshotTaken(() => refetch()),
       window.electronAPI.onResetView(() => refetch()),
-      window.electronAPI.onSolutionError((error: string) => {
-        showToast(
-          "Processing Failed",
-          "There was an error processing your screenshots.",
-          "error"
-        )
-        setView("main")
-        console.error("Processing error:", error)
-      }),
       window.electronAPI.onProcessingNoScreenshots(() => {
         showToast(
           "No Screenshots",

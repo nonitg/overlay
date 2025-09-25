@@ -1,6 +1,6 @@
 import { ToastProvider } from "./components/ui/toast"
 import Main from "./_pages/Main"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { QueryClient, QueryClientProvider } from "react-query"
 
 declare global {
@@ -21,7 +21,7 @@ declare global {
       ) => () => void
       onProcessingNoScreenshots: (callback: () => void) => () => void
       onResetView: (callback: () => void) => () => void
-      takeScreenshot: () => Promise<void>
+      takeScreenshot: () => Promise<{ path: string; preview: string }>
 
       // solution/debug events removed
       deleteScreenshot: (
@@ -38,6 +38,14 @@ declare global {
       moveWindowDown: () => Promise<void>
       quitApp: () => Promise<void>
       invoke: (channel: string, ...args: any[]) => Promise<any>
+      
+      // conversation events
+      onNewQuestion?: (callback: () => void) => () => void
+      onFollowUpQuestion?: (callback: (data: {
+        screenshotPath: string,
+        hasContext: boolean
+      }) => void) => () => void
+      onNoContextWarning?: (callback: () => void) => () => void
     }
   }
 }
@@ -50,6 +58,23 @@ const queryClient = new QueryClient({
     }
   }
 })
+
+// debounce utility function
+function debounce<T extends (...args: any[]) => void>(
+  func: T, 
+  delay: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: NodeJS.Timeout | null = null
+  
+  return (...args: Parameters<T>) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+    timeoutId = setTimeout(() => {
+      func(...args)
+    }, delay)
+  }
+}
 
 const App: React.FC = () => {
   const [view, setView] = useState<"main">("main")
@@ -68,32 +93,39 @@ const App: React.FC = () => {
     }
   }, [])
 
+  // memoized debounced updateHeight function  
+  const updateHeight = useCallback(() => {
+    if (!containerRef.current) return
+    
+    // Get the actual content dimensions - use getBoundingClientRect for accurate sizing
+    const rect = containerRef.current.getBoundingClientRect()
+    const width = Math.ceil(rect.width)
+    const height = Math.ceil(rect.height)
+    
+    // Cap the maximum size to prevent huge windows and match visible content
+    const finalWidth = Math.min(Math.max(width, 600), 750)  // Max 750px wide (to fit narrower conversation box)
+    const finalHeight = Math.min(Math.max(height, 400), 800)  // Max 800px tall (to fit larger conversation content)
+    
+    window.electronAPI?.updateContentDimensions({ 
+      width: finalWidth, 
+      height: finalHeight 
+    })
+  }, [])
+
+  // debounced version with 150ms delay to prevent excessive IPC calls
+  const debouncedUpdateHeight = useMemo(() => 
+    debounce(updateHeight, 150), 
+    [updateHeight]
+  )
+
   useEffect(() => {
     if (!containerRef.current) return
 
-    const updateHeight = () => {
-      if (!containerRef.current) return
-      
-      // Get the actual content dimensions - use getBoundingClientRect for accurate sizing
-      const rect = containerRef.current.getBoundingClientRect()
-      const width = Math.ceil(rect.width)
-      const height = Math.ceil(rect.height)
-      
-      // Cap the maximum size to prevent huge windows
-      const finalWidth = Math.min(Math.max(width, 200), 800)  // Max 800px wide
-      const finalHeight = Math.min(Math.max(height, 100), 600)  // Max 600px tall
-      
-      window.electronAPI?.updateContentDimensions({ 
-        width: finalWidth, 
-        height: finalHeight 
-      })
-    }
-
     const resizeObserver = new ResizeObserver(() => {
-      updateHeight()
+      debouncedUpdateHeight()
     })
 
-    // Initial height update
+    // Initial height update (immediate, not debounced)
     updateHeight()
 
     // Observe for changes
@@ -101,7 +133,7 @@ const App: React.FC = () => {
 
     // Also update height when view changes
     const mutationObserver = new MutationObserver(() => {
-      updateHeight()
+      debouncedUpdateHeight()
     })
 
     mutationObserver.observe(containerRef.current, {
@@ -115,7 +147,7 @@ const App: React.FC = () => {
       resizeObserver.disconnect()
       mutationObserver.disconnect()
     }
-  }, [view]) // Re-run when view changes
+  }, [view, updateHeight, debouncedUpdateHeight]) // Re-run when view changes
 
   useEffect(() => {
     const cleanupFunctions = [
@@ -135,7 +167,7 @@ const App: React.FC = () => {
   }, [])
 
   return (
-    <div ref={containerRef} className="min-h-0 w-fit max-w-2xl overflow-visible">
+    <div ref={containerRef} className="min-h-0 overflow-hidden">
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <Main setView={setView} />

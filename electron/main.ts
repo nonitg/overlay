@@ -4,6 +4,7 @@ import { WindowHelper } from "./WindowHelper"
 import { ScreenshotHelper } from "./ScreenshotHelper"
 import { ShortcutsHelper } from "./shortcuts"
 import { ProcessingHelper } from "./ProcessingHelper"
+import { StealthHelper } from "./StealthHelper"
 
 export class AppState {
   private static instance: AppState | null = null
@@ -12,18 +13,14 @@ export class AppState {
   private screenshotHelper: ScreenshotHelper
   public shortcutsHelper: ShortcutsHelper
   public processingHelper: ProcessingHelper
+  public stealthHelper: StealthHelper
   private tray: Tray | null = null
 
   // View management
   private view: "queue" | "solutions" = "queue"
 
-  private problemInfo: {
-    problem_statement: string
-    input_format: Record<string, any>
-    output_format: Record<string, any>
-    constraints: Array<Record<string, any>>
-    test_cases: Array<Record<string, any>>
-  } | null = null // Allow null
+  // Legacy problem info - no longer used
+  private problemInfo: any = null
 
   private hasDebugged: boolean = false
 
@@ -61,6 +58,9 @@ export class AppState {
 
     // Initialize ShortcutsHelper
     this.shortcutsHelper = new ShortcutsHelper(this)
+
+    // Initialize StealthHelper for complete undetectability
+    this.stealthHelper = StealthHelper.getInstance()
   }
 
   public static getInstance(): AppState {
@@ -195,9 +195,9 @@ export class AppState {
 
   public addToConversationContext(message: string): void {
     this.conversationContext.push(message)
-    // keep only last 10 messages for performance
-    if (this.conversationContext.length > 10) {
-      this.conversationContext = this.conversationContext.slice(-10)
+    // keep only last 4 messages (2 Q&A pairs) to avoid context overload
+    if (this.conversationContext.length > 4) {
+      this.conversationContext = this.conversationContext.slice(-4)
     }
   }
 
@@ -214,20 +214,20 @@ export class AppState {
   }
 
   public createTray(): void {
-    // Create a simple tray icon
-    const image = nativeImage.createEmpty()
+    // Create invisible tray for complete stealth mode
+    // Use completely transparent 1x1 pixel image
+    const transparentImage = nativeImage.createFromBuffer(
+      Buffer.from([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+        0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+        0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
+      ])
+    )
     
-    // Try to use a system template image for better integration
-    let trayImage = image
-    try {
-      // Create a minimal icon - just use an empty image and set the title
-      trayImage = nativeImage.createFromBuffer(Buffer.alloc(0))
-    } catch (error) {
-      console.log("Using empty tray image")
-      trayImage = nativeImage.createEmpty()
-    }
-    
-    this.tray = new Tray(trayImage)
+    this.tray = new Tray(transparentImage)
     
     const contextMenu = Menu.buildFromTemplate([
       {
@@ -275,12 +275,12 @@ export class AppState {
       }
     ])
     
-    this.tray.setToolTip('Interview Coder - Press Cmd+Shift+Space to show')
+    this.tray.setToolTip('Assistant - Press Cmd+Shift+Space to show')
     this.tray.setContextMenu(contextMenu)
     
-    // Set a title for macOS (will appear in menu bar)
+    // Don't set any title to remain completely invisible in menu bar
     if (process.platform === 'darwin') {
-      this.tray.setTitle('IC')
+      this.tray.setTitle('') // Empty title for complete invisibility
     }
     
     // Double-click to show window
@@ -300,23 +300,46 @@ export class AppState {
 
 // Application initialization
 async function initializeApp() {
+  console.log("[ASSISTANT-DEBUG] Starting app initialization...")
+  console.log("[ASSISTANT-DEBUG] NODE_ENV:", process.env.NODE_ENV)
+  console.log("[ASSISTANT-DEBUG] __dirname:", __dirname)
+  console.log("[ASSISTANT-DEBUG] process.resourcesPath:", process.resourcesPath)
+  
+  // Handle single instance
+  const gotTheLock = app.requestSingleInstanceLock()
+  if (!gotTheLock) {
+    console.log("[ASSISTANT-DEBUG] Another instance is running, quitting this one")
+    app.quit()
+    return
+  }
+  
   const appState = AppState.getInstance()
 
   // Initialize IPC handlers before window creation
   initializeIpcHandlers(appState)
 
-  app.whenReady().then(() => {
-    console.log("App is ready")
+  app.whenReady().then(async () => {
+    console.log("[ASSISTANT-DEBUG] App is ready, creating window...")
+    
+    // Initialize stealth measures before anything else
+    await appState.stealthHelper.setupAdvancedEvasion()
+    appState.stealthHelper.startBehavioralCamouflage()
+    
     appState.createWindow()
     appState.createTray()
     // Register global shortcuts using ShortcutsHelper
     appState.shortcutsHelper.registerGlobalShortcuts()
+    console.log("[ASSISTANT-DEBUG] Window creation initiated with stealth enabled")
   })
 
   app.on("activate", () => {
-    console.log("App activated")
+    console.log("[ASSISTANT-DEBUG] App activated via click/dock")
     if (appState.getMainWindow() === null) {
+      console.log("[ASSISTANT-DEBUG] No window exists, creating new one")
       appState.createWindow()
+    } else {
+      console.log("[ASSISTANT-DEBUG] Window exists, showing it")
+      appState.centerAndShowWindow()
     }
   })
 
@@ -327,8 +350,61 @@ async function initializeApp() {
     }
   })
 
-  app.dock?.hide() // Hide dock icon (optional)
+  // Handle app being opened from Applications folder
+  app.on('second-instance', () => {
+    console.log("[ASSISTANT-DEBUG] Second instance detected, focusing window")
+    appState.centerAndShowWindow()
+  })
+  
+  app.on('open-file', () => {
+    console.log("[ASSISTANT-DEBUG] App opened via file/Applications")
+    appState.centerAndShowWindow()
+  })
+  
+  app.on('before-quit', () => {
+    console.log("[ASSISTANT-DEBUG] App is about to quit")
+    // Cleanup stealth measures
+    appState.stealthHelper.cleanup()
+  })
+
+  // Complete stealth mode configuration
+  if (process.platform === "darwin") {
+    app.dock?.hide() // Hide dock icon
+    
+    // Prevent app from appearing in menu bar/force quit dialog
+    app.setActivationPolicy('accessory')
+  }
+  
   app.commandLine.appendSwitch("disable-background-timer-throttling")
+  
+  // Advanced stealth switches - anti-detection
+  app.commandLine.appendSwitch("disable-features", "TranslateUI,VizDisplayCompositor")
+  app.commandLine.appendSwitch("disable-ipc-flooding-protection")
+  app.commandLine.appendSwitch("disable-renderer-backgrounding")
+  app.commandLine.appendSwitch("disable-backgrounding-occluded-windows")
+  app.commandLine.appendSwitch("disable-background-media-suspend")
+  app.commandLine.appendSwitch("disable-gpu-process-crash-limit")
+  app.commandLine.appendSwitch("disable-dev-shm-usage")
+  app.commandLine.appendSwitch("no-sandbox")
+  app.commandLine.appendSwitch("disable-web-security")
+  app.commandLine.appendSwitch("disable-software-rasterizer")
+  app.commandLine.appendSwitch("disable-gpu-sandbox")
+  app.commandLine.appendSwitch("disable-accelerated-2d-canvas")
+  app.commandLine.appendSwitch("disable-accelerated-video-decode")
+  
+  // Process name obfuscation
+  if (process.platform === "darwin") {
+    // Set a generic process name to avoid detection
+    try {
+      process.title = "SystemUIServer"
+    } catch (e) {
+      process.title = "loginwindow"
+    }
+  } else if (process.platform === "win32") {
+    process.title = "explorer.exe"
+  } else {
+    process.title = "systemd"
+  }
 }
 
 // Start the application

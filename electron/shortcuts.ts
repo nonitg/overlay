@@ -42,13 +42,15 @@ export class ShortcutsHelper {
     console.log("🔧 CommandOrControl+Enter registered:", enterShortcut)
 
     globalShortcut.register("CommandOrControl+Shift+Enter", async () => {
-      console.log("Follow-up question: same context")
+      console.log("🔥 Follow-up question: same context")
       
       try {
         // check if we have existing context
         const currentScreenshot = this.appState.getCurrentScreenshot()
+        console.log("📷 Current screenshot path:", currentScreenshot)
+        
         if (!currentScreenshot) {
-          console.log("No existing conversation - treating as new question")
+          console.log("❌ No existing conversation - treating as new question")
           // trigger new question flow instead
           this.appState.getMainWindow()?.webContents.send("no-context-warning")
           return
@@ -57,13 +59,20 @@ export class ShortcutsHelper {
         // send follow-up event to renderer
         const mainWindow = this.appState.getMainWindow()
         if (mainWindow) {
+          console.log("📤 Sending follow-up-question event to renderer with data:", {
+            screenshotPath: currentScreenshot,
+            hasContext: true
+          })
           mainWindow.webContents.send("follow-up-question", {
             screenshotPath: currentScreenshot,
             hasContext: true
           })
+          console.log("✅ Follow-up event sent successfully")
+        } else {
+          console.log("❌ No main window available")
         }
       } catch (error) {
-        console.error("Error in follow-up flow:", error)
+        console.error("❌ Error in follow-up flow:", error)
       }
     })
 

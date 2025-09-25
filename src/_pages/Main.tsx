@@ -27,7 +27,25 @@ const Main: React.FC<MainProps> = ({ setView: _setView }) => {
   const [showConversation, setShowConversation] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [conversationAnswer, setConversationAnswer] = useState<string | null>(null)
+  const [isFollowUpMode, setIsFollowUpMode] = useState(false)
+  
+  // pro mode state
+  const [isProMode, setIsProMode] = useState(false)
 
+  // reset conversation state
+  const resetConversation = () => {
+    setShowConversation(false)
+    setConversationAnswer(null)
+    setIsFollowUpMode(false)
+    setIsProcessing(false)
+  }
+
+  // reset for new question (keeps dialog open)
+  const resetForNewQuestion = () => {
+    setConversationAnswer(null)
+    setIsFollowUpMode(false)
+    setIsProcessing(false)
+  }
 
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -85,92 +103,153 @@ const Main: React.FC<MainProps> = ({ setView: _setView }) => {
 
   // conversation handler
   const handleQuestionSubmit = async (question: string) => {
+    const isCurrentlyFollowUp = isFollowUpMode
+    
     setIsProcessing(true)
-    setConversationAnswer(null)
     
     try {
-      // take screenshot after getting the question
-      const screenshotPath = await window.electronAPI.takeScreenshot()
+      let screenshotPath: { path: string; preview: string }
+      
+      if (isCurrentlyFollowUp) {
+        // follow-up: don't take new screenshot, use existing one
+        // get current screenshot from the conversation context
+        const currentScreenshotPath = await window.electronAPI.invoke("get-current-screenshot")
+        if (!currentScreenshotPath) {
+          throw new Error("No existing screenshot found for follow-up")
+        }
+        screenshotPath = { path: currentScreenshotPath, preview: "" }
+      } else {
+        // new question: take fresh screenshot
+        screenshotPath = await window.electronAPI.takeScreenshot()
+      }
       
       // process with AI
       const result = await window.electronAPI.invoke("process-question", {
         question: question,
         screenshotPath: screenshotPath.path,
-        isNewConversation: true
+        isNewConversation: !isCurrentlyFollowUp,
+        useProMode: isProMode
       })
       
       if (result.success) {
-        setConversationAnswer(result.response)
+        if (isCurrentlyFollowUp) {
+          // for follow-up, add to existing conversation
+          const followupEntry = `User: ${question}\nAI: ${result.response}`
+          setConversationAnswer(prev => 
+            prev ? `${prev}\n\n---\n\n${followupEntry}` : followupEntry
+          )
+        } else {
+          // new conversation - format with user question
+          const newConversation = `User: ${question}\nAI: ${result.response}`
+          setConversationAnswer(newConversation)
+        }
       } else {
-        setConversationAnswer(`Error: ${result.error}`)
+        const errorMsg = `Error: ${result.error}`
+        if (isCurrentlyFollowUp) {
+          setConversationAnswer(prev => 
+            prev ? `${prev}\n\n---\n\n${errorMsg}` : errorMsg
+          )
+        } else {
+          setConversationAnswer(errorMsg)
+        }
       }
     } catch (error: any) {
-      setConversationAnswer(`Error: ${error.message}`)
+      const errorMsg = `Error: ${error.message}`
+      if (isCurrentlyFollowUp) {
+        setConversationAnswer(prev => 
+          prev ? `${prev}\n\n---\n\n${errorMsg}` : errorMsg
+        )
+      } else {
+        setConversationAnswer(errorMsg)
+      }
     } finally {
       setIsProcessing(false)
+      // keep follow-up mode active if this was a follow-up question
+      if (!isCurrentlyFollowUp) {
+        setIsFollowUpMode(false)
+      }
     }
   }
 
   useEffect(() => {
+    
 
-    const cleanupFunctions = [
-      window.electronAPI.onScreenshotTaken(() => refetch()),
-      window.electronAPI.onResetView(() => refetch()),
-      window.electronAPI.onProcessingNoScreenshots(() => {
+
+    const cleanupFunctions: Array<() => void> = []
+
+    // Basic event listeners that should always work
+    if (window.electronAPI.onScreenshotTaken) {
+      cleanupFunctions.push(window.electronAPI.onScreenshotTaken(() => refetch()))
+    }
+    
+    if (window.electronAPI.onResetView) {
+      cleanupFunctions.push(window.electronAPI.onResetView(() => {
+        refetch()
+        resetConversation()
+      }))
+    }
+    
+    if (window.electronAPI.onProcessingNoScreenshots) {
+      cleanupFunctions.push(window.electronAPI.onProcessingNoScreenshots(() => {
         showToast(
           "No Screenshots",
           "There are no screenshots to process.",
           "neutral"
         )
-      }),
+      }))
+    }
 
-      // handle new question events - show conversation box
-      window.electronAPI.onNewQuestion?.(() => {
-        console.log("📨 Received new-question event - showing conversation box")
+        // handle new question events - show conversation box
+    if (window.electronAPI.onNewQuestion) {
+             const cleanup = window.electronAPI.onNewQuestion(() => {
+        // reset state but keep dialog open for new questions
+        resetForNewQuestion()
         setShowConversation(true)
-        setConversationAnswer(null)
-      }),
+      })
+      cleanupFunctions.push(cleanup)
+    }
 
-      // handle follow-up events
-      window.electronAPI.onFollowUpQuestion?.(async (data: {
+    // handle follow-up events
+    if (window.electronAPI.onFollowUpQuestion) {
+      const cleanup = window.electronAPI.onFollowUpQuestion(async (data: {
         screenshotPath: string,
         hasContext: boolean
       }) => {
         if (!data.hasContext) {
-          console.log("No context available for follow-up")
+          showToast("No Context", "No existing conversation to continue", "neutral")
           return
         }
         
-        setIsProcessing(true)
-        setShowConversation(true)
-        
+        // load existing conversation context when opening follow-up
         try {
-          const result = await window.electronAPI.invoke("process-question", {
-            screenshotPath: data.screenshotPath,
-            isNewConversation: false
-          })
-          
-          if (result.success) {
-            // extend existing content
-            setConversationAnswer(prev => 
-              prev ? `${prev}\n\n---\n\n${result.response}` : result.response
-            )
+          const context = await window.electronAPI.invoke("get-conversation-context")
+          if (context && context.length > 0) {
+            // display full conversation context for follow-ups
+            const formattedContext = context.join('\n\n')
+            if (formattedContext) {
+              setConversationAnswer(formattedContext)
+            }
           }
-        } catch (error: any) {
-          setConversationAnswer(prev => 
-            prev ? `${prev}\n\nError: ${error.message}` : `Error: ${error.message}`
-          )
-        } finally {
-          setIsProcessing(false)
+        } catch (error) {
+          console.error("Error loading conversation context:", error)
         }
-      }),
-
-      // handle no context warning
-      window.electronAPI.onNoContextWarning?.(() => {
-        console.log("No existing conversation context")
-        // could show a brief message or just start new conversation
+        
+        setShowConversation(true)
+        setIsFollowUpMode(true)
       })
-    ]
+      
+      if (cleanup && typeof cleanup === 'function') {
+        cleanupFunctions.push(cleanup)
+      }
+    }
+
+    // handle no context warning  
+    if (window.electronAPI.onNoContextWarning) {
+      const cleanup = window.electronAPI.onNoContextWarning(() => {
+        showToast("No Context", "Start a new conversation first", "neutral")
+      })
+      cleanupFunctions.push(cleanup)
+    }
 
     return () => {
       cleanupFunctions.forEach((cleanup) => cleanup?.())
@@ -189,12 +268,11 @@ const Main: React.FC<MainProps> = ({ setView: _setView }) => {
       ref={barRef}
       style={{
         position: "relative",
-        width: "100%",
         pointerEvents: "auto"
       }}
-      className="select-none max-w-full overflow-visible"
+      className="select-none overflow-hidden"
     >
-      <div className="bg-transparent w-full max-w-full overflow-visible relative">
+      <div className="bg-transparent overflow-hidden relative">
         <div className="px-2 py-1">
           <Toast
             open={toastOpen}
@@ -205,17 +283,24 @@ const Main: React.FC<MainProps> = ({ setView: _setView }) => {
             <ToastTitle>{toastMessage.title}</ToastTitle>
             <ToastDescription>{toastMessage.description}</ToastDescription>
           </Toast>
-          <div className="w-full">
-            <MainCommands />
-            
-            <ConversationBox 
-              isVisible={showConversation}
-              onQuestionSubmit={handleQuestionSubmit}
-              isLoading={isProcessing}
-              answer={conversationAnswer}
+          <div className="w-full flex justify-center">
+            <MainCommands 
+              isProMode={isProMode}
+              onProModeToggle={setIsProMode}
+              isProcessing={isProcessing}
             />
           </div>
         </div>
+        
+        {/* ConversationBox outside the padding constraint */}
+        <ConversationBox 
+          isVisible={showConversation}
+          onQuestionSubmit={handleQuestionSubmit}
+          isLoading={isProcessing}
+          answer={conversationAnswer}
+          isFollowUp={isFollowUpMode}
+          onClose={resetConversation}
+        />
       </div>
     </div>
   )
